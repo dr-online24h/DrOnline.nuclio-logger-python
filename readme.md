@@ -94,3 +94,9 @@ Estrutura sugerida de repos:
 | `github.com/dronline/nuclio-logger-php`    | pasta `php/`      |
 
 Cada repo recebe apenas o conteúdo da pasta correspondente na raiz.
+
+
+## Serverless
+
+`pip install \
+  git+https://github.com/dr-online24h/DrOnline.nuclio-logger-python.git`
