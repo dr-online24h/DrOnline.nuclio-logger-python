@@ -1,4 +1,6 @@
 import psycopg2
+from psycopg2.extras import execute_values
+from .logger import NuclioLogger
 
 class NuclioDatabase:
 
@@ -38,3 +40,34 @@ class NuclioDatabase:
         except Exception as e:
             self.logger.error("Erro ao consultar o banco de dados", context={"erro": str(e)})
             return []
+
+    def insert(host, database, port, user, password, query, values):
+        try:
+            # Estabelece a conexão com o banco de dados
+            conn = psycopg2.connect(
+                host=host,
+                database=database,
+                user=user,
+                password=password,
+                port=port,
+            )
+
+            # Cria um cursor para executar as consultas
+            cur = conn.cursor()
+            execute_values(cur, query, values)
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            return {
+                'status': True,
+                'message': f'Carga {tabela} inicial atualizada com sucesso!'
+            }
+
+        except Exception as e:
+            self.logger.error("Erro ao inserir dados o banco de dados", context={"query": query, "error": str(e)})
+            return {
+                'status': False,
+                'message': 'Erro ao inserir dados o banco de dados',
+                "context":  {"query": query, "error": str(e)}
+            }
