@@ -28,13 +28,13 @@ class NuclioAthena:
             region_name=self.region_name
         )
 
-        self.s3_client = boto3.client('athena',
+        self.s3_client = boto3.client('s3',
             aws_access_key_id=self.aws_access_key_id,
             aws_secret_access_key=self.aws_secret_access_key,
             region_name=self.region_name
         )
 
-    def executar_consulta(query):
+    def executar_consulta(self, query):
         response = self.athena_client.start_query_execution(
             QueryString=query,
             QueryExecutionContext={'Database': self.database},
@@ -44,7 +44,7 @@ class NuclioAthena:
         )
         return response['QueryExecutionId']
 
-    def esperar_conclusao_consulta(query_execution_id):
+    def esperar_conclusao_consulta(self, query_execution_id):
         while True:
             response = self.athena_client.get_query_execution(QueryExecutionId=query_execution_id)
 
@@ -60,21 +60,7 @@ class NuclioAthena:
             self.logger.info("Aguardando a conclusão da consulta...", context={})
             time.sleep(10)
 
-    def baixar_arquivos(diretorio_destino, file):
-
-        if not os.path.exists(diretorio_destino):
-            os.makedirs(diretorio_destino)
-
-        caminho_local = os.path.join(diretorio_destino, os.path.basename(file))
-
-        try:
-            self.logger.info(f'Baixando {file} para {caminho_local}', context={})
-            self.s3_client.download_file(self.bucket_s3, file, caminho_local)
-        except Exception as e:
-            self.logger.warning("Arquivo não encontrado", context={"warning": str(file)})
-
-
-    def download_query_results(s3_location, filename):
+    def download_query_results(self, s3_location, filename):
 
         # Definindo o diretório destino para o arquivo
         diretorio_destino =  filename + '.csv'

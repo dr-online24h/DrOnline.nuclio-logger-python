@@ -7,7 +7,7 @@ class NuclioDatabase:
     def __init__(self):
         self.logger = NuclioLogger(service="pipeline-database", min_level="INFO")
 
-    def consultar_coluna(host, database, port, user, password, tabela, coluna):
+    def consultar_coluna(self, host, database, port, user, password, tabela, coluna):
         try:
             # Estabelece a conexão com o banco de dados
             conn = psycopg2.connect(
