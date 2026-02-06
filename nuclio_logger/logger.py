@@ -1,6 +1,6 @@
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 
 class NuclioLogger:
@@ -30,9 +30,13 @@ class NuclioLogger:
         if self.LEVELS.get(level, 0) < self.min_level:
             return
 
+        # Timezone de Brasilia (UTC-3)
+        tz_brasilia = timezone(timedelta(hours=-3))
+        now = datetime.now(tz_brasilia)
+
         entry: dict = {
-            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") +
-                         f"{datetime.now(timezone.utc).microsecond // 1000:03d}Z",
+            "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.") +
+                         f"{now.microsecond // 1000:03d}-03:00",
             "level":     level,
             "service":   self.service,
             "message":   message,
