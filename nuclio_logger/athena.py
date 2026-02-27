@@ -34,6 +34,74 @@ class NuclioAthena:
             region_name=self.region_name
         )
 
+    def athena_query_to_dataframe(
+        query: str,
+        database: str = "postgresdb",
+        output_location: str = "s3://backup-dronline/athena-results/",
+        region_name: str = "us-west-2",
+        sleep_time: int = 2,
+    ) -> pd.DataFrame:
+        """
+        Executa uma query no Athena e retorna um DataFrame.
+
+        :param query: SQL a ser executado
+        :param database: Database do Athena
+        :param output_location: S3 onde o Athena salva os resultados (ex: s3://bucket/path/)
+        :param region_name: Região AWS
+        :param sleep_time: Intervalo de espera entre checks
+        :return: pandas.DataFrame
+        """
+
+        athena = boto3.client("athena", region_name=region_name)
+
+        # 1️⃣ Executar query
+        response = athena.start_query_execution(
+            QueryString=query,
+            QueryExecutionContext={"Database": database},
+            ResultConfiguration={"OutputLocation": output_location},
+        )
+
+        query_execution_id = response["QueryExecutionId"]
+
+        # 2️⃣ Esperar finalizar
+        while True:
+            result = athena.get_query_execution(QueryExecutionId=query_execution_id)
+            status = result["QueryExecution"]["Status"]["State"]
+
+            if status in ["SUCCEEDED", "FAILED", "CANCELLED"]:
+                break
+
+            time.sleep(sleep_time)
+
+        if status != "SUCCEEDED":
+            reason = result["QueryExecution"]["Status"].get("StateChangeReason", "")
+            raise Exception(f"Query falhou: {status} - {reason}")
+
+        # 3️⃣ Buscar resultados com paginação
+        paginator = athena.get_paginator("get_query_results")
+        page_iterator = paginator.paginate(QueryExecutionId=query_execution_id)
+
+        columns = None
+        rows = []
+
+        for page in page_iterator:
+            if columns is None:
+                columns = [
+                    col["Label"]
+                    for col in page["ResultSet"]["ResultSetMetadata"]["ColumnInfo"]
+                ]
+
+            for row in page["ResultSet"]["Rows"]:
+                rows.append([col.get("VarCharValue") for col in row["Data"]])
+
+        # Remove header duplicado (primeira linha)
+        rows = rows[1:]
+
+        df = pd.DataFrame(rows, columns=columns)
+
+        return df
+
+
     def executar_consulta(self, query):
         response = self.athena_client.start_query_execution(
             QueryString=query,
