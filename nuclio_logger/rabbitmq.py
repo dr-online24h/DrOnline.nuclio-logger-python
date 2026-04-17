@@ -17,6 +17,15 @@ class NuclioRabbitMQ:
         self.password = os.getenv('RABBITMQ_PASSWORD', 'guest')
         self.virtual_host = os.getenv('RABBITMQ_VIRTUAL_HOST', '/')
 
+        # Configuracoes de exchange e queue
+        self.image_docker = os.getenv('IMAGE_DOCKER', 'default')
+        self.exchange_name = os.getenv('RABBITMQ_EXCHANGE_NAME', f'exchange-{self.image_docker}')
+        self.exchange_type = os.getenv('RABBITMQ_EXCHANGE_TYPE', 'direct')
+        self.durable = os.getenv('RABBITMQ_DURABLE', 'true').lower() == 'true'
+        self.auto_ack = os.getenv('RABBITMQ_AUTO_ACK', 'false').lower() == 'true'
+        self.on_error = os.getenv('RABBITMQ_ON_ERROR', 'nack')
+        self.queue_name = os.getenv('RABBITMQ_QUEUE_NAME', f'queue-{self.image_docker}')
+
         self.logger = NuclioLogger(service="nuclio-rabbitmq", min_level="INFO")
         self._connection = None
         self._channel = None
@@ -234,6 +243,94 @@ class NuclioRabbitMQ:
                 'status': False,
                 'message': 'Erro ao publicar mensagem com delay',
                 'context': {"queue": queue_name, "delay_ms": delay_ms, "erro": str(e)}
+            }
+
+    def validate_queue_and_exchange(self, queue_name, exchange=''):
+        """
+        Valida se a queue e o exchange existem no RabbitMQ.
+
+        Args:
+            queue_name: nome da fila a ser validada
+            exchange: nome do exchange a ser validado (default: '' para exchange padrao)
+
+        Returns:
+            dict com status, queue_exists, exchange_exists e message
+        """
+        try:
+            if not self._connect():
+                return {
+                    'status': False,
+                    'queue_exists': False,
+                    'exchange_exists': False,
+                    'message': 'Erro ao conectar ao RabbitMQ'
+                }
+
+            queue_exists = False
+            exchange_exists = False
+            validation_errors = []
+
+            # Valida se a queue existe
+            try:
+                self._channel.queue_declare(queue=queue_name, passive=True)
+                queue_exists = True
+                self.logger.info("Queue validada com sucesso", context={
+                    "queue": queue_name
+                })
+            except Exception as e:
+                validation_errors.append(f"Queue '{queue_name}' nao existe: {str(e)}")
+                self.logger.warning("Queue nao encontrada", context={
+                    "queue": queue_name,
+                    "erro": str(e)
+                })
+
+            # Valida se o exchange existe (apenas se nao for o exchange padrao)
+            if exchange != '':
+                try:
+                    self._channel.exchange_declare(exchange=exchange, passive=True)
+                    exchange_exists = True
+                    self.logger.info("Exchange validado com sucesso", context={
+                        "exchange": exchange
+                    })
+                except Exception as e:
+                    validation_errors.append(f"Exchange '{exchange}' nao existe: {str(e)}")
+                    self.logger.warning("Exchange nao encontrado", context={
+                        "exchange": exchange,
+                        "erro": str(e)
+                    })
+            else:
+                # Exchange padrao sempre existe
+                exchange_exists = True
+
+            self._close()
+
+            # Monta a resposta
+            if queue_exists and exchange_exists:
+                return {
+                    'status': True,
+                    'queue_exists': True,
+                    'exchange_exists': True,
+                    'message': 'Queue e exchange validados com sucesso'
+                }
+            else:
+                return {
+                    'status': False,
+                    'queue_exists': queue_exists,
+                    'exchange_exists': exchange_exists,
+                    'message': '; '.join(validation_errors)
+                }
+
+        except Exception as e:
+            self.logger.error("Erro ao validar queue e exchange", context={
+                "queue": queue_name,
+                "exchange": exchange,
+                "erro": str(e)
+            })
+            self._close()
+            return {
+                'status': False,
+                'queue_exists': False,
+                'exchange_exists': False,
+                'message': f'Erro ao validar: {str(e)}'
             }
 
     def publish(self, queue_name, message, delay_ms=0, exchange='', routing_key=None, properties=None):
