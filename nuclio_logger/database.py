@@ -41,7 +41,7 @@ class NuclioDatabase:
             self.logger.error("Erro ao consultar o banco de dados", context={"erro": str(e)})
             return []
 
-    def insert(host, database, port, user, password, query, values):
+    def insert(self, host, database, port, user, password, query, values):
         try:
             # Estabelece a conexão com o banco de dados
             conn = psycopg2.connect(
@@ -61,7 +61,7 @@ class NuclioDatabase:
 
             return {
                 'status': True,
-                'message': f'Carga {tabela} inicial atualizada com sucesso!'
+                'message': 'Dados inseridos com sucesso!'
             }
 
         except Exception as e:
